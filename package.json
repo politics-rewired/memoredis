@@ -1,6 +1,6 @@
 {
   "name": "memoredis",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "description": "Redis memoization library with good Typescript generics, locking, and argument-wide bulk invalidation",
   "main": "build/main/index.js",
   "typings": "build/main/index.d.ts",
