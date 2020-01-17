@@ -1,3 +1,3 @@
 # redis-memoize-invalidate
 
-Redis memoization with locking and invalidating
+Redis memoization library with good Typescript generics, locking, and argument-wide bulk invalidation
