@@ -175,3 +175,30 @@ describe('invalidation', () => {
     expect(mock).toHaveBeenCalledTimes(1);
   });
 });
+
+describe('prefixes', () => {
+  test('should keep keyspaces separate', async () => {
+    const a = createMemoizer({ prefix: 'a' });
+    const b = createMemoizer({ prefix: 'b' });
+
+    const mock = jest.fn();
+
+    const memoizableFunction = async () => {
+      mock();
+      return 4;
+    };
+
+    const aF = a.memoize(memoizableFunction, {
+      key: 'prefix-test'
+    });
+
+    const bF = b.memoize(memoizableFunction, {
+      key: 'prefix-test'
+    });
+
+    await aF({ a: 1 });
+    await bF({ a: 1 });
+
+    expect(mock).toHaveBeenCalledTimes(2);
+  });
+});

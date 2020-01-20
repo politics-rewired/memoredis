@@ -54,7 +54,7 @@ export const createMemoizer = (instanceOpts: MemoizerOpts) => {
       client.get(key, (err, reply) =>
         err
           ? reject(err)
-          : resolve(reply === null ? (JSON.parse(reply) as T) : (reply as null))
+          : resolve(reply !== null ? (JSON.parse(reply) as T) : (reply as null))
       )
     );
 
