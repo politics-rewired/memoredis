@@ -15,6 +15,11 @@ describe('produceKeyWithArgs', () => {
       produceKeyWithArgs('prefix', 'key', { b: 2, a: 1 })
     );
   });
+
+  test('should use sha1 for nested object values', () => {
+    const keyHash = produceKeyWithArgs('prefix', 'key', { a: { b: 1 } });
+    expect(keyHash).toMatch(/|prefix|key|a:.*/);
+  });
 });
 
 describe('basic functionality', () => {

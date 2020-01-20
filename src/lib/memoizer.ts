@@ -1,3 +1,5 @@
+import crypto from 'crypto';
+import jsonStableStringify from 'json-stable-stringify';
 import redis, { ClientOpts, RedisClient } from 'redis';
 import redisLock from 'redis-lock';
 import { String } from 'runtypes';
@@ -174,4 +176,13 @@ const stringifyArgs = (args: MemoizedFunctionArgs) =>
     .map(key => stringifyArg(key, args[key]))
     .sort();
 
-const stringifyArg = (key: string, value: any) => `${key}:${value}`;
+const stringifyArg = (key: string, value: any) =>
+  `${key}:${typeof value === 'object' ? objectHash(value) : value}`;
+
+const objectHash = obj => sha1(jsonStableStringify(obj));
+
+const sha1 = str =>
+  crypto
+    .createHmac('sha1', 'memo')
+    .update(str)
+    .digest('hex');
