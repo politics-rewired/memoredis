@@ -13,6 +13,7 @@ interface MemoizerOpts {
   prefix?: string;
   client?: RedisClient;
   clientOpts?: ClientOpts;
+  emptyMode?: boolean;
 }
 
 interface MemoizeOpts {
@@ -28,6 +29,21 @@ interface MemoizedFunctionArgs {
 type MemoizableFunction<T, U> = (args: T) => Promise<U>;
 
 export const createMemoizer = (instanceOpts: MemoizerOpts) => {
+  if (instanceOpts.emptyMode) {
+    return {
+      // tslint:disable-next-line: variable-name
+      invalidate: async (_key: string, _forArgs: MemoizedFunctionArgs) => {
+        // do nothing
+      },
+      // tslint:disable-next-line: variable-name
+      memoize: <T, U>(fn: MemoizableFunction<T, U>, _opts: MemoizeOpts) => {
+        return async (args: T): Promise<U> => {
+          return fn(args);
+        };
+      }
+    };
+  }
+
   const client = instanceOpts.client
     ? instanceOpts.client
     : redis.createClient(instanceOpts.clientOpts);

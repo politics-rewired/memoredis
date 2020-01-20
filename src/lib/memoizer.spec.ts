@@ -202,3 +202,24 @@ describe('prefixes', () => {
     expect(mock).toHaveBeenCalledTimes(2);
   });
 });
+
+describe('empty mode', () => {
+  test('if empty mode should not cache', async () => {
+    const memoizer = createMemoizer({ emptyMode: true });
+
+    const mock = jest.fn();
+
+    const memoizableFunction = async () => {
+      mock();
+      return 4;
+    };
+
+    const memoizedFunction = memoizer.memoize(memoizableFunction, {
+      key: 'empty-mode-test'
+    });
+
+    await memoizedFunction({ a: 1 });
+    await memoizedFunction({ a: 1 });
+    expect(mock).toHaveBeenCalledTimes(2);
+  });
+});
