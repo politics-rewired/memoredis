@@ -3,6 +3,7 @@ import jsonStableStringify from 'json-stable-stringify';
 import redis, { ClientOpts, RedisClient } from 'redis';
 import redisLock from 'redis-lock';
 import { String } from 'runtypes';
+import { jsonDateParser } from 'json-date-parser';
 
 const SafeString = String.withConstraint(
   s => !s.includes(':') && !s.includes('|')
@@ -72,7 +73,11 @@ export const createMemoizer = (instanceOpts: MemoizerOpts) => {
       client.get(key, (err, reply) =>
         err
           ? reject(err)
-          : resolve(reply !== null ? (JSON.parse(reply) as T) : (reply as null))
+          : resolve(
+              reply !== null
+                ? (JSON.parse(reply, jsonDateParser) as T)
+                : (reply as null)
+            )
       )
     );
 
