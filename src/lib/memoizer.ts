@@ -1,9 +1,9 @@
 import crypto from 'crypto';
+import { jsonDateParser } from 'json-date-parser';
 import jsonStableStringify from 'json-stable-stringify';
 import redis, { ClientOpts, RedisClient } from 'redis';
 import redisLock from 'redis-lock';
 import { String } from 'runtypes';
-import { jsonDateParser } from 'json-date-parser';
 
 const SafeString = String.withConstraint(
   s => !s.includes(':') && !s.includes('|')
@@ -99,10 +99,10 @@ export const createMemoizer = (instanceOpts: MemoizerOpts) => {
 
   const scanAll = async (match: string) => {
     let keys: string[] = [];
-    let cursor = '1';
+    let cursor;
 
     while (cursor !== '0') {
-      const result = await scan(match);
+      const result = await scan(match, cursor);
 
       cursor = result[0];
       keys = keys.concat(result[1]);

@@ -228,3 +228,31 @@ describe('empty mode', () => {
     expect(mock).toHaveBeenCalledTimes(2);
   });
 });
+
+describe('scan all cursor', () => {
+  test('if we have 1000 keys we should be able to invalidate them all quickly', async () => {
+    const m = createMemoizer({ prefix: 'a' });
+
+    const mock = jest.fn();
+
+    const memoizableFunction = async () => {
+      mock();
+      return 4;
+    };
+
+    const memoizedFunction = m.memoize(memoizableFunction, {
+      key: 'scan-all-delete'
+    });
+
+    // Call it 1000 times with different args and one same arg
+    await Promise.all(
+      new Array(1000)
+        .fill(null)
+        .map((_, n) => memoizedFunction({ n, same: true }))
+    );
+
+    await m.invalidate('scan-all-delete', { same: true });
+    await memoizedFunction({ n: 1, same: true });
+    expect(mock).toHaveBeenCalledTimes(1001);
+  });
+});
