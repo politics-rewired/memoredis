@@ -12,11 +12,19 @@ const SafeString = String.withConstraint(
 const DEFAULT_TTL = 60 * 1000;
 const DEFAULT_LOCK_TIMEOUT = 5 * 1000;
 
+interface Logger {
+  debug(primaryMessage: string, ...supportingData: any[]): void;
+  info(primaryMessage: string, ...supportingData: any[]): void;
+  warn(primaryMessage: string, ...supportingData: any[]): void;
+  error(primaryMessage: string, ...supportingData: any[]): void;
+}
+
 interface MemoizerOpts {
   prefix?: string;
   client?: RedisClient;
   clientOpts?: ClientOpts;
   emptyMode?: boolean;
+  logger?: Logger;
 }
 
 interface MemoizeOpts {
@@ -51,6 +59,8 @@ export const createMemoizer = (instanceOpts: MemoizerOpts) => {
     ? instanceOpts.client
     : redis.createClient(instanceOpts.clientOpts);
 
+  const logger: Logger = instanceOpts.logger ? instanceOpts.logger : console;
+
   const cbLock = redisLock(client);
   const withLock = <T>(key, timeout, cb): Promise<T> =>
     new Promise(resolve => {
@@ -62,23 +72,46 @@ export const createMemoizer = (instanceOpts: MemoizerOpts) => {
     });
 
   const psetex = (key: string, milliseconds: number, value: any) =>
-    new Promise((resolve, reject) =>
-      client.psetex(key, milliseconds, JSON.stringify(value), err =>
-        err ? reject(err) : resolve(true)
-      )
-    );
+    new Promise((resolve, _reject) => {
+      let jsonValue;
+      try {
+        jsonValue = JSON.stringify(value);
+      } catch (err) {
+        logger.error(
+          `memoredis: JSON.stringify error setting key ${key}. Raw value ${value}`,
+          err
+        );
+        return resolve(null);
+      }
+
+      client.psetex(key, milliseconds, jsonValue, err => {
+        if (err) {
+          logger.error(`memoredis: redis error setting key ${key}.`, err);
+          return resolve(null);
+        }
+        return resolve(true);
+      });
+    });
 
   const get = <T>(key: string): Promise<T | null> =>
-    new Promise((resolve, reject) =>
-      client.get(key, (err, reply) =>
-        err
-          ? reject(err)
-          : resolve(
-              reply !== null
-                ? (JSON.parse(reply, jsonDateParser) as T)
-                : (reply as null)
-            )
-      )
+    new Promise((resolve, _reject) =>
+      client.get(key, (err, reply) => {
+        if (err) {
+          logger.error(`memoredis: redis error getting key ${key}.`, err);
+          return resolve(null);
+        }
+        if (reply === null) return resolve(null);
+
+        try {
+          return resolve(JSON.parse(reply, jsonDateParser) as T);
+        } catch (err) {
+          logger.error(
+            `memoredis: JSON parse error getting key ${key}. Reply as ${reply}`,
+            err
+          );
+          return resolve(null);
+        }
+      })
     );
 
   const scan = (match: string, cursor?: string) =>
