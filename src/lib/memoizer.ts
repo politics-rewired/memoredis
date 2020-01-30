@@ -72,6 +72,7 @@ export const createMemoizer = (instanceOpts: MemoizerOpts) => {
     });
 
   const psetex = (key: string, milliseconds: number, value: any) =>
+    // tslint:disable-next-line: variable-name
     new Promise((resolve, _reject) => {
       let jsonValue;
       try {
@@ -94,13 +95,16 @@ export const createMemoizer = (instanceOpts: MemoizerOpts) => {
     });
 
   const get = <T>(key: string): Promise<T | null> =>
+    // tslint:disable-next-line: variable-name
     new Promise((resolve, _reject) =>
       client.get(key, (err, reply) => {
         if (err) {
           logger.error(`memoredis: redis error getting key ${key}.`, err);
           return resolve(null);
         }
-        if (reply === null) return resolve(null);
+        if (reply === null) {
+          return resolve(null);
+        }
 
         try {
           return resolve(JSON.parse(reply, jsonDateParser) as T);
