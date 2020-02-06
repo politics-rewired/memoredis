@@ -2,7 +2,7 @@ import benny from 'benny';
 import faker from 'faker';
 import { sample } from 'lodash';
 import { createClient } from 'redis';
-import { createMemoizer } from '../lib/memoizer';
+import { createMemoizer } from '../src/lib/memoizer';
 
 type TestSpec = [string, number];
 
