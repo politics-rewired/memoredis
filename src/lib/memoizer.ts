@@ -1,9 +1,8 @@
 import crypto from 'crypto';
-import { jsonDateParser } from 'json-date-parser';
 import jsonStableStringify from 'json-stable-stringify';
 import redis, { ClientOpts, RedisClient } from 'redis';
-import redisLock from 'redis-lock';
 import { String } from 'runtypes';
+import { makeEasyRedis } from './redis';
 
 const SafeString = String.withConstraint(
   s => !s.includes(':') && !s.includes('|')
@@ -12,7 +11,7 @@ const SafeString = String.withConstraint(
 const DEFAULT_TTL = 60 * 1000;
 const DEFAULT_LOCK_TIMEOUT = 5 * 1000;
 
-interface Logger {
+export interface Logger {
   debug(primaryMessage: string, ...supportingData: any[]): void;
   info(primaryMessage: string, ...supportingData: any[]): void;
   warn(primaryMessage: string, ...supportingData: any[]): void;
@@ -61,103 +60,17 @@ export const createMemoizer = (instanceOpts: MemoizerOpts) => {
 
   const logger: Logger = instanceOpts.logger ? instanceOpts.logger : console;
 
-  const cbLock = redisLock(client);
-  const withLock = <T>(key, timeout, cb): Promise<T> =>
-    new Promise(resolve => {
-      cbLock(key, timeout, async release => {
-        const result = await cb();
-        release();
-        return resolve(result as T);
-      });
-    });
-
-  const psetex = (key: string, milliseconds: number, value: any) =>
-    // tslint:disable-next-line: variable-name
-    new Promise((resolve, _reject) => {
-      let jsonValue;
-      try {
-        jsonValue = JSON.stringify(value);
-      } catch (err) {
-        logger.error(
-          `memoredis: JSON.stringify error setting key ${key}. Raw value ${value}`,
-          err
-        );
-        return resolve(null);
-      }
-
-      client.psetex(key, milliseconds, jsonValue, err => {
-        if (err) {
-          logger.error(`memoredis: redis error setting key ${key}.`, err);
-          return resolve(null);
-        }
-        return resolve(true);
-      });
-    });
-
-  const get = <T>(key: string): Promise<T | null> =>
-    // tslint:disable-next-line: variable-name
-    new Promise((resolve, _reject) =>
-      client.get(key, (err, reply) => {
-        if (err) {
-          logger.error(`memoredis: redis error getting key ${key}.`, err);
-          return resolve(null);
-        }
-        if (reply === null) {
-          return resolve(null);
-        }
-
-        try {
-          return resolve(JSON.parse(reply, jsonDateParser) as T);
-        } catch (err) {
-          logger.error(
-            `memoredis: JSON parse error getting key ${key}. Reply as ${reply}`,
-            err
-          );
-          return resolve(null);
-        }
-      })
-    );
-
-  const scan = (match: string, cursor?: string) =>
-    new Promise((resolve, reject) => {
-      const callback = (err, result) => {
-        if (err) {
-          return reject(err);
-        }
-
-        const [newCursor, keys] = result;
-        return resolve([newCursor, keys]);
-      };
-
-      return cursor
-        ? client.scan(cursor, 'match', match, callback)
-        : client.scan('0', 'match', match, callback);
-    });
-
-  const scanAll = async (match: string) => {
-    let keys: string[] = [];
-    let cursor;
-
-    while (cursor !== '0') {
-      const result = await scan(match, cursor);
-
-      cursor = result[0];
-      keys = keys.concat(result[1]);
-    }
-
-    return keys;
-  };
-
-  const del = async (keys: string[]) =>
-    new Promise((resolve, reject) =>
-      client.del(keys, err => (err ? reject(err) : resolve(true)))
-    );
+  const { withLock, psetexAndSadd, get, scanSetAll, delAndRem } = makeEasyRedis(
+    client,
+    logger
+  );
 
   if (instanceOpts.prefix) {
     SafeString.check(instanceOpts.prefix);
   }
 
   const invalidate = async (key: string, forArgs: MemoizedFunctionArgs) => {
+    const setKey = produceSetKey(instanceOpts.prefix, key);
     SafeString.check(key);
 
     const glob =
@@ -165,10 +78,10 @@ export const createMemoizer = (instanceOpts: MemoizerOpts) => {
         '*'
       ) + '*';
 
-    const cachedKeys = await scanAll(glob);
+    const cachedKeys = await scanSetAll(setKey, glob);
 
     if (cachedKeys.length > 0) {
-      await del(cachedKeys);
+      await delAndRem(setKey, cachedKeys);
     }
   };
 
@@ -177,6 +90,7 @@ export const createMemoizer = (instanceOpts: MemoizerOpts) => {
 
     return async (args: T): Promise<U> => {
       const redisKey = produceKeyWithArgs(instanceOpts.prefix, opts.key, args);
+      const setKey = produceSetKey(instanceOpts.prefix, opts.key);
 
       // attempt early memoized return
       const foundResult = (await get(redisKey)) as U;
@@ -194,7 +108,12 @@ export const createMemoizer = (instanceOpts: MemoizerOpts) => {
           }
 
           const result = await fn(args);
-          await psetex(redisKey, opts.ttl || DEFAULT_TTL, result);
+          await psetexAndSadd(
+            setKey,
+            redisKey,
+            opts.ttl || DEFAULT_TTL,
+            result
+          );
           return result;
         }
       );
@@ -212,6 +131,9 @@ export const produceKeyWithArgs = (
 
 const produceKey = (prefix: string, key: string) =>
   prefix ? `${prefix}|${key}` : key;
+
+const produceSetKey = (prefix: string, key: string) =>
+  prefix ? `${prefix}|${key}-keyset` : `${key}-keyset`;
 
 const stringifyArgs = (args: MemoizedFunctionArgs) =>
   Object.keys(args)
