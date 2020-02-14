@@ -60,10 +60,14 @@ export const createMemoizer = (instanceOpts: MemoizerOpts) => {
 
   const logger: Logger = instanceOpts.logger ? instanceOpts.logger : console;
 
-  const { withLock, psetexAndSadd, get, scanSetAll, delAndRem } = makeEasyRedis(
-    client,
-    logger
-  );
+  const {
+    withLock,
+    psetexAndSadd,
+    get,
+    scanSetAll,
+    delAndRem,
+    sadd
+  } = makeEasyRedis(client, logger);
 
   if (instanceOpts.prefix) {
     SafeString.check(instanceOpts.prefix);
@@ -95,6 +99,7 @@ export const createMemoizer = (instanceOpts: MemoizerOpts) => {
       // attempt early memoized return
       const foundResult = (await get(redisKey)) as U;
       if (foundResult) {
+        await sadd(setKey, redisKey);
         return foundResult;
       }
 
