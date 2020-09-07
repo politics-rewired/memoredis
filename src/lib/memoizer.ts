@@ -38,9 +38,22 @@ interface MemoizedFunctionArgs {
 
 type MemoizableFunction<T, U> = (args: T) => Promise<U>;
 
-export const createMemoizer = (instanceOpts: MemoizerOpts) => {
+interface Memoizer {
+  invalidate(key: string, args: MemoizedFunctionArgs): Promise<void>;
+  memoize<T, U>(
+    fn: MemoizableFunction<T, U>,
+    opts: MemoizeOpts
+  ): MemoizableFunction<T, U>;
+  quit(): Promise<'OK'>;
+  end(flush?: boolean): void;
+}
+
+export const createMemoizer = (instanceOpts: MemoizerOpts): Memoizer => {
   if (instanceOpts.emptyMode) {
     return {
+      end: () => {
+        // do nothing
+      },
       // tslint:disable-next-line: variable-name
       invalidate: async (_key: string, _forArgs: MemoizedFunctionArgs) => {
         // do nothing
@@ -50,7 +63,8 @@ export const createMemoizer = (instanceOpts: MemoizerOpts) => {
         return async (args: T): Promise<U> => {
           return fn(args);
         };
-      }
+      },
+      quit: async () => 'OK'
     };
   }
 
@@ -125,7 +139,14 @@ export const createMemoizer = (instanceOpts: MemoizerOpts) => {
     };
   };
 
-  return { memoize, invalidate };
+  const quit = async () =>
+    new Promise<'OK'>((resolve, reject) =>
+      client.quit((err, reply) => (err !== null ? reject(err) : resolve(reply)))
+    );
+
+  const end = (flush?: boolean) => client.end(flush);
+
+  return { memoize, invalidate, quit, end };
 };
 
 export const produceKeyWithArgs = (
