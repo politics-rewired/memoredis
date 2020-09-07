@@ -1,3 +1,19 @@
+# Changelog
+
+All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
+
+## [1.1.0](https://github.com/politics-rewired/memoredis/compare/v1.0.8...v1.1.0) (2020-09-07)
+
+
+### Features
+
+* expose redis client quit and end methods ([bc23715](https://github.com/politics-rewired/memoredis/commit/bc237156ae76661ba9dbc55a148b32a0dba7d845))
+
+
+### Bug Fixes
+
+* allow non-yarn package manager ([219939e](https://github.com/politics-rewired/memoredis/commit/219939e5deee7469206a418932065ccabbac50e0))
+
 ## [1.0.8](https://github.com/politics-rewired/memoredis/compare/v1.0.7...v1.0.8) (2020-02-14)
 
 
@@ -78,6 +94,3 @@
 ### Features
 
 * done, all tests passing ([99fd888](https://github.com/politics-rewired/memoredis/commit/99fd88847d803960779eb2628467afa21b00d3d4))
-
-
-
