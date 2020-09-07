@@ -49,6 +49,8 @@ describe('basic functionality', () => {
     await memoizedFunction(args);
     await memoizedFunction(args);
     expect(mock).toHaveBeenCalledTimes(1);
+
+    await memoizer.quit();
   });
 
   test('should distinguish different args', async () => {
@@ -68,6 +70,8 @@ describe('basic functionality', () => {
     await memoizedFunction({ a: 1 });
     await memoizedFunction({ a: 2 });
     expect(mock).toHaveBeenCalledTimes(2);
+
+    await memoizer.quit();
   });
 
   test('should lock duplicate calls', async () => {
@@ -87,6 +91,8 @@ describe('basic functionality', () => {
 
     await Promise.all([memoizedFunction({ a: 1 }), memoizedFunction({ a: 1 })]);
     expect(mock).toHaveBeenCalledTimes(1);
+
+    await memoizer.quit();
   });
 });
 
@@ -118,6 +124,8 @@ describe('invalidation', () => {
     await memoizer.invalidate('basic-invalidate', args);
     await memoizedFunction(args);
     expect(mock).toHaveBeenCalledTimes(2);
+
+    await memoizer.quit();
   });
 
   test('should call once if different arg is invalidated', async () => {
@@ -138,6 +146,8 @@ describe('invalidation', () => {
     await memoizer.invalidate('basic-invalidate', { a: 5 });
     await memoizedFunction({ a: 4 });
     expect(mock).toHaveBeenCalledTimes(1);
+
+    await memoizer.quit();
   });
 
   test('should call twice if different compound covered invalidate', async () => {
@@ -158,6 +168,8 @@ describe('invalidation', () => {
     await memoizer.invalidate('compound-covered-invalidate', { a: 1 });
     await memoizedFunction({ a: 1, b: 2 });
     expect(mock).toHaveBeenCalledTimes(2);
+
+    await memoizer.quit();
   });
 
   test('should call once if invalidation is partially wrong', async () => {
@@ -178,6 +190,8 @@ describe('invalidation', () => {
     await memoizer.invalidate('compound-missed-invalidate', { a: 1, b: 3 });
     await memoizedFunction({ a: 1, b: 2 });
     expect(mock).toHaveBeenCalledTimes(1);
+
+    await memoizer.quit();
   });
 });
 
@@ -205,6 +219,9 @@ describe('prefixes', () => {
     await bF({ a: 1 });
 
     expect(mock).toHaveBeenCalledTimes(2);
+
+    await a.quit();
+    await b.quit();
   });
 });
 
@@ -226,6 +243,8 @@ describe('empty mode', () => {
     await memoizedFunction({ a: 1 });
     await memoizedFunction({ a: 1 });
     expect(mock).toHaveBeenCalledTimes(2);
+
+    await memoizer.quit();
   });
 });
 
@@ -254,5 +273,7 @@ describe('scan all cursor', () => {
     await m.invalidate('scan-all-delete', { same: true });
     await memoizedFunction({ n: 1, same: true });
     expect(mock).toHaveBeenCalledTimes(1001);
+
+    await m.quit();
   });
 });
