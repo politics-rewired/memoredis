@@ -18,7 +18,7 @@ export interface Logger {
   error(primaryMessage: string, ...supportingData: any[]): void;
 }
 
-interface MemoizerOpts {
+export interface MemoizerOpts {
   prefix?: string;
   client?: RedisClient;
   clientOpts?: ClientOpts;
@@ -26,19 +26,19 @@ interface MemoizerOpts {
   logger?: Logger;
 }
 
-interface MemoizeOpts {
+export interface MemoizeOpts {
   key: string;
   lockTimeout?: number;
   ttl?: number;
 }
 
-interface MemoizedFunctionArgs {
+export interface MemoizedFunctionArgs {
   [key: string]: any;
 }
 
-type MemoizableFunction<T, U> = (args: T) => Promise<U>;
+export type MemoizableFunction<T, U> = (args: T) => Promise<U>;
 
-interface Memoizer {
+export interface Memoizer {
   invalidate(key: string, args: MemoizedFunctionArgs): Promise<void>;
   memoize<T, U>(
     fn: MemoizableFunction<T, U>,
