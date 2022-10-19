@@ -1,13 +1,14 @@
-import redis from 'redis';
+import { createClient } from 'redis';
 import { createMemoizer, produceKeyWithArgs } from './memoizer';
 
-const flushRedis = () =>
-  new Promise((resolve, reject) => {
-    const client = redis.createClient();
-    client.flushall('ASYNC', err => (err ? reject(err) : resolve(true)));
-  });
+const flushRedis = async () => {
+  const client = createClient();
+  await client.connect();
+  await client.flushAll();
+  await client.disconnect();
+};
 
-const sleep = n => new Promise(resolve => setTimeout(resolve, n * 1000));
+const sleep = (n) => new Promise((resolve) => setTimeout(resolve, n * 1000));
 
 describe('produceKeyWithArgs', () => {
   test('produceKeyWithArgs should produce the same key for differently ordered objects', () => {
@@ -32,7 +33,7 @@ describe('basic functionality', () => {
   });
 
   test('should only call function once for same args', async () => {
-    const memoizer = createMemoizer({});
+    const memoizer = await createMemoizer({});
 
     const mock = jest.fn();
 
@@ -42,19 +43,19 @@ describe('basic functionality', () => {
     };
 
     const memoizedFunction = memoizer.memoize(memoizableFunction, {
-      key: 'basic'
+      key: 'basic',
     });
 
     const args = { a: 4 };
     await memoizedFunction(args);
     await memoizedFunction(args);
-    expect(mock).toHaveBeenCalledTimes(1);
-
     await memoizer.quit();
+
+    expect(mock).toHaveBeenCalledTimes(1);
   });
 
   test('should distinguish different args', async () => {
-    const memoizer = createMemoizer({});
+    const memoizer = await createMemoizer({});
 
     const mock = jest.fn();
 
@@ -64,18 +65,18 @@ describe('basic functionality', () => {
     };
 
     const memoizedFunction = memoizer.memoize(memoizableFunction, {
-      key: 'different'
+      key: 'different',
     });
 
     await memoizedFunction({ a: 1 });
     await memoizedFunction({ a: 2 });
-    expect(mock).toHaveBeenCalledTimes(2);
-
     await memoizer.quit();
+
+    expect(mock).toHaveBeenCalledTimes(2);
   });
 
   test('should lock duplicate calls', async () => {
-    const memoizer = createMemoizer({});
+    const memoizer = await createMemoizer({});
 
     const mock = jest.fn();
 
@@ -86,13 +87,13 @@ describe('basic functionality', () => {
     };
 
     const memoizedFunction = memoizer.memoize(memoizableSlowFunction, {
-      key: 'locking'
+      key: 'locking',
     });
 
     await Promise.all([memoizedFunction({ a: 1 }), memoizedFunction({ a: 1 })]);
-    expect(mock).toHaveBeenCalledTimes(1);
-
     await memoizer.quit();
+
+    expect(mock).toHaveBeenCalledTimes(1);
   });
 });
 
@@ -106,7 +107,7 @@ describe('invalidation', () => {
   });
 
   test('should call twice if invalidated', async () => {
-    const memoizer = createMemoizer({});
+    const memoizer = await createMemoizer({});
 
     const mock = jest.fn();
 
@@ -116,7 +117,7 @@ describe('invalidation', () => {
     };
 
     const memoizedFunction = memoizer.memoize(memoizableFunction, {
-      key: 'basic-invalidate'
+      key: 'basic-invalidate',
     });
 
     const args = { a: 4 };
@@ -129,7 +130,7 @@ describe('invalidation', () => {
   });
 
   test('should call once if different arg is invalidated', async () => {
-    const memoizer = createMemoizer({});
+    const memoizer = await createMemoizer({});
 
     const mock = jest.fn();
 
@@ -139,7 +140,7 @@ describe('invalidation', () => {
     };
 
     const memoizedFunction = memoizer.memoize(memoizableFunction, {
-      key: 'missed-invalidate'
+      key: 'missed-invalidate',
     });
 
     await memoizedFunction({ a: 4 });
@@ -151,7 +152,7 @@ describe('invalidation', () => {
   });
 
   test('should call twice if different compound covered invalidate', async () => {
-    const memoizer = createMemoizer({});
+    const memoizer = await createMemoizer({});
 
     const mock = jest.fn();
 
@@ -161,7 +162,7 @@ describe('invalidation', () => {
     };
 
     const memoizedFunction = memoizer.memoize(memoizableFunction, {
-      key: 'compound-covered-invalidate'
+      key: 'compound-covered-invalidate',
     });
 
     await memoizedFunction({ a: 1, b: 2 });
@@ -173,7 +174,7 @@ describe('invalidation', () => {
   });
 
   test('should call once if invalidation is partially wrong', async () => {
-    const memoizer = createMemoizer({});
+    const memoizer = await createMemoizer({});
 
     const mock = jest.fn();
 
@@ -183,7 +184,7 @@ describe('invalidation', () => {
     };
 
     const memoizedFunction = memoizer.memoize(memoizableFunction, {
-      key: 'compound-missed-invalidate'
+      key: 'compound-missed-invalidate',
     });
 
     await memoizedFunction({ a: 1, b: 2 });
@@ -197,8 +198,8 @@ describe('invalidation', () => {
 
 describe('prefixes', () => {
   test('should keep keyspaces separate', async () => {
-    const a = createMemoizer({ prefix: 'a' });
-    const b = createMemoizer({ prefix: 'b' });
+    const a = await createMemoizer({ prefix: 'a' });
+    const b = await createMemoizer({ prefix: 'b' });
 
     const mock = jest.fn();
 
@@ -208,11 +209,11 @@ describe('prefixes', () => {
     };
 
     const aF = a.memoize(memoizableFunction, {
-      key: 'prefix-test'
+      key: 'prefix-test',
     });
 
     const bF = b.memoize(memoizableFunction, {
-      key: 'prefix-test'
+      key: 'prefix-test',
     });
 
     await aF({ a: 1 });
@@ -227,7 +228,7 @@ describe('prefixes', () => {
 
 describe('empty mode', () => {
   test('if empty mode should not cache', async () => {
-    const memoizer = createMemoizer({ emptyMode: true });
+    const memoizer = await createMemoizer({ emptyMode: true });
 
     const mock = jest.fn();
 
@@ -237,7 +238,7 @@ describe('empty mode', () => {
     };
 
     const memoizedFunction = memoizer.memoize(memoizableFunction, {
-      key: 'empty-mode-test'
+      key: 'empty-mode-test',
     });
 
     await memoizedFunction({ a: 1 });
@@ -250,7 +251,7 @@ describe('empty mode', () => {
 
 describe('scan all cursor', () => {
   test('if we have 1000 keys we should be able to invalidate them all quickly', async () => {
-    const m = createMemoizer({ prefix: 'a' });
+    const m = await createMemoizer({ prefix: 'a' });
 
     const mock = jest.fn();
 
@@ -260,7 +261,7 @@ describe('scan all cursor', () => {
     };
 
     const memoizedFunction = m.memoize(memoizableFunction, {
-      key: 'scan-all-delete'
+      key: 'scan-all-delete',
     });
 
     // Call it 1000 times with different args and one same arg

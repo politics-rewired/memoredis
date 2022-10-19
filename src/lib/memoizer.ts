@@ -1,11 +1,11 @@
 import crypto from 'crypto';
 import jsonStableStringify from 'json-stable-stringify';
-import redis, { ClientOpts, RedisClient } from 'redis';
+import { createClient, RedisClientOptions, RedisClientType } from 'redis';
 import { String } from 'runtypes';
 import { makeEasyRedis } from './redis';
 
 const SafeString = String.withConstraint(
-  s => !s.includes(':') && !s.includes('|')
+  (s) => !s.includes(':') && !s.includes('|')
 );
 
 const DEFAULT_TTL = 60 * 1000;
@@ -20,8 +20,8 @@ export interface Logger {
 
 export interface MemoizerOpts {
   prefix?: string;
-  client?: RedisClient;
-  clientOpts?: ClientOpts;
+  client?: RedisClientType;
+  clientOpts?: RedisClientOptions;
   emptyMode?: boolean;
   logger?: Logger;
 }
@@ -44,44 +44,42 @@ export interface Memoizer {
     fn: MemoizableFunction<T, U>,
     opts: MemoizeOpts
   ): MemoizableFunction<T, U>;
-  quit(): Promise<'OK'>;
-  end(flush?: boolean): void;
+  quit(): void;
+  end(): void;
 }
 
-export const createMemoizer = (instanceOpts: MemoizerOpts): Memoizer => {
+export const createMemoizer = async (
+  instanceOpts: MemoizerOpts
+): Promise<Memoizer> => {
   if (instanceOpts.emptyMode) {
     return {
       end: () => {
         // do nothing
       },
-      // tslint:disable-next-line: variable-name
       invalidate: async (_key: string, _forArgs: MemoizedFunctionArgs) => {
         // do nothing
       },
-      // tslint:disable-next-line: variable-name
       memoize: <T, U>(fn: MemoizableFunction<T, U>, _opts: MemoizeOpts) => {
         return async (args: T): Promise<U> => {
           return fn(args);
         };
       },
-      quit: async () => 'OK'
+      quit: async () => 'OK',
     };
   }
 
-  const client = instanceOpts.client
-    ? instanceOpts.client
-    : redis.createClient(instanceOpts.clientOpts);
+  const client: RedisClientType = (
+    instanceOpts.client
+      ? instanceOpts.client
+      : createClient(instanceOpts.clientOpts)
+  ) as RedisClientType;
+
+  await client.connect();
 
   const logger: Logger = instanceOpts.logger ? instanceOpts.logger : console;
 
-  const {
-    withLock,
-    psetexAndSadd,
-    get,
-    scanSetAll,
-    delAndRem,
-    sadd
-  } = makeEasyRedis(client, logger);
+  const { withLock, pSetExAndSAdd, get, scanSetAll, delAndRem, sAdd } =
+    makeEasyRedis(client, logger);
 
   if (instanceOpts.prefix) {
     SafeString.check(instanceOpts.prefix);
@@ -113,21 +111,21 @@ export const createMemoizer = (instanceOpts: MemoizerOpts): Memoizer => {
       // attempt early memoized return
       const foundResult = (await get(redisKey)) as U;
       if (foundResult) {
-        await sadd(setKey, redisKey);
+        await sAdd(setKey, redisKey);
         return foundResult;
       }
 
-      return withLock<U>(
+      return withLock(
         redisKey,
         opts.lockTimeout || DEFAULT_LOCK_TIMEOUT,
         async () => {
-          const foundResultAfterLock = await get<U>(redisKey);
+          const foundResultAfterLock = await get(redisKey);
           if (foundResultAfterLock) {
             return foundResultAfterLock;
           }
 
           const result = await fn(args);
-          await psetexAndSadd(
+          await pSetExAndSAdd(
             setKey,
             redisKey,
             opts.ttl || DEFAULT_TTL,
@@ -135,16 +133,13 @@ export const createMemoizer = (instanceOpts: MemoizerOpts): Memoizer => {
           );
           return result;
         }
-      );
+      ) as U;
     };
   };
 
-  const quit = async () =>
-    new Promise<'OK'>((resolve, reject) =>
-      client.quit((err, reply) => (err !== null ? reject(err) : resolve(reply)))
-    );
+  const quit = async () => client.quit();
 
-  const end = (flush?: boolean) => client.end(flush);
+  const end = async () => client.disconnect();
 
   return { memoize, invalidate, quit, end };
 };
@@ -163,16 +158,13 @@ const produceSetKey = (prefix: string, key: string) =>
 
 const stringifyArgs = (args: MemoizedFunctionArgs) =>
   Object.keys(args)
-    .map(key => stringifyArg(key, args[key]))
+    .map((key) => stringifyArg(key, args[key]))
     .sort();
 
 const stringifyArg = (key: string, value: any) =>
   `${key}:${typeof value === 'object' ? objectHash(value) : value}`;
 
-const objectHash = obj => sha1(jsonStableStringify(obj));
+const objectHash = (obj: Record<string, any>) => sha1(jsonStableStringify(obj));
 
-const sha1 = str =>
-  crypto
-    .createHmac('sha1', 'memo')
-    .update(str)
-    .digest('hex');
+const sha1 = (str: string) =>
+  crypto.createHmac('sha1', 'memo').update(str).digest('hex');

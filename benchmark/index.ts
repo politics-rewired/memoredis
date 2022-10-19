@@ -10,7 +10,7 @@ const small: TestSpec[] = [
   [faker.commerce.product(), 1000],
   [faker.commerce.product(), 1000],
   [faker.commerce.product(), 1000],
-  [faker.commerce.product(), 1000]
+  [faker.commerce.product(), 1000],
 ];
 
 const medium: TestSpec[] = [
@@ -28,7 +28,7 @@ const medium: TestSpec[] = [
   [faker.commerce.product(), 10000],
   [faker.commerce.product(), 10000],
   [faker.commerce.product(), 10000],
-  [faker.commerce.product(), 10000]
+  [faker.commerce.product(), 10000],
 ];
 
 const large: TestSpec[] = [
@@ -46,7 +46,7 @@ const large: TestSpec[] = [
   [faker.commerce.product(), 100000],
   [faker.commerce.product(), 100000],
   [faker.commerce.product(), 100000],
-  [faker.commerce.product(), 100000]
+  [faker.commerce.product(), 100000],
 ];
 
 const TEST_KEY_TTL = 1000 * 100;
@@ -56,7 +56,7 @@ const setup = async (testSpec: TestSpec[], prefix: string) => {
 
   const memoizer = createMemoizer({ client, prefix });
 
-  await testSpec.map(async keySpec => {
+  await testSpec.map(async (keySpec) => {
     const [name, keyCount] = keySpec;
     const fn = memoizer.memoize(
       async () => {
