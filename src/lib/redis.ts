@@ -6,9 +6,17 @@ export const makeEasyRedis = (client: RedisClientType, logger: Logger) => {
   const lockerRoom = new Lock(client);
 
   const withLock = async (key: string, timeout: number, fn: () => void) => {
-    await lockerRoom.acquireLock(`lock-${key}`, { ttl: timeout / 1000 });
-    const result = await fn();
-    await lockerRoom.releaseLock(`lock-${key}`);
+    let result = null;
+
+    try {
+      await lockerRoom.acquireLock(`lock-${key}`, { ttl: timeout / 1000 });
+      result = await fn();
+    } catch (e) {
+      logger.error(`memoredis: Failed to acquire lock or compute function`, e);
+    } finally {
+      await lockerRoom.releaseLock(`lock-${key}`);
+    }
+
     return result;
   };
 

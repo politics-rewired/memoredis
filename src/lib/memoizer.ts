@@ -44,8 +44,8 @@ export interface Memoizer {
     fn: MemoizableFunction<T, U>,
     opts: MemoizeOpts
   ): MemoizableFunction<T, U>;
-  quit(): void;
-  end(): void;
+  quit(): Promise<void>;
+  end(): Promise<void>;
 }
 
 export const createMemoizer = async (
