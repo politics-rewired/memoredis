@@ -11,19 +11,11 @@ const SafeString = String.withConstraint(
 const DEFAULT_TTL = 60 * 1000;
 const DEFAULT_LOCK_TIMEOUT = 5 * 1000;
 
-export interface Logger {
-  debug(primaryMessage: string, ...supportingData: any[]): void;
-  info(primaryMessage: string, ...supportingData: any[]): void;
-  warn(primaryMessage: string, ...supportingData: any[]): void;
-  error(primaryMessage: string, ...supportingData: any[]): void;
-}
-
 export interface MemoizerOpts {
   prefix?: string;
   client?: RedisClientType;
   clientOpts?: RedisClientOptions;
   emptyMode?: boolean;
-  logger?: Logger;
 }
 
 export interface MemoizeOpts {
@@ -53,9 +45,10 @@ export const createMemoizer = async (
 ): Promise<Memoizer> => {
   if (instanceOpts.emptyMode) {
     return {
-      end: () => {
-        // do nothing
-      },
+      end: () =>
+        new Promise((resolve) => {
+          resolve();
+        }),
       invalidate: async (_key: string, _forArgs: MemoizedFunctionArgs) => {
         // do nothing
       },
@@ -64,7 +57,10 @@ export const createMemoizer = async (
           return fn(args);
         };
       },
-      quit: async () => 'OK',
+      quit: async () =>
+        new Promise((resolve) => {
+          resolve();
+        }),
     };
   }
 
@@ -76,10 +72,8 @@ export const createMemoizer = async (
 
   await client.connect();
 
-  const logger: Logger = instanceOpts.logger ? instanceOpts.logger : console;
-
   const { withLock, pSetExAndSAdd, get, scanSetAll, delAndRem, sAdd } =
-    makeEasyRedis(client, logger);
+    makeEasyRedis(client);
 
   if (instanceOpts.prefix) {
     SafeString.check(instanceOpts.prefix);

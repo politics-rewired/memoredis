@@ -1,36 +1,21 @@
 import { RedisClientType } from 'redis';
-import { Logger } from './memoizer';
 import { Lock } from 'redis-promise-lock';
 
-export const makeEasyRedis = (client: RedisClientType, logger: Logger) => {
+export const makeEasyRedis = (client: RedisClientType) => {
   const lockerRoom = new Lock(client);
 
   const withLock = async (key: string, timeout: number, fn: () => void) => {
-    let result = null;
-
     try {
       await lockerRoom.acquireLock(`lock-${key}`, { ttl: timeout / 1000 });
-      result = await fn();
-    } catch (e) {
-      logger.error(`memoredis: Failed to acquire lock or compute function`, e);
+      const result = await fn();
+      return result;
     } finally {
       await lockerRoom.releaseLock(`lock-${key}`);
     }
-
-    return result;
   };
 
   const pSetEx = async (key: string, milliseconds: number, value: any) => {
-    let jsonValue;
-    try {
-      jsonValue = JSON.stringify(value);
-    } catch (err) {
-      logger.error(
-        `memoredis: JSON.stringify error setting key ${key}. Raw value ${value}`,
-        err
-      );
-      return null;
-    }
+    const jsonValue = JSON.stringify(value);
 
     return client.pSetEx(key, milliseconds, jsonValue);
   };
@@ -41,16 +26,7 @@ export const makeEasyRedis = (client: RedisClientType, logger: Logger) => {
     milliseconds: number,
     value: any
   ) => {
-    let jsonValue;
-    try {
-      jsonValue = JSON.stringify(value);
-    } catch (err) {
-      logger.error(
-        `memoredis: JSON.stringify error setting key ${key}. Raw value ${value}`,
-        err
-      );
-      return null;
-    }
+    const jsonValue = JSON.stringify(value);
 
     return client
       .multi()
