@@ -64,16 +64,20 @@ export const createMemoizer = async (
     };
   }
 
-  const client: RedisClientType = (
-    instanceOpts.client
-      ? instanceOpts.client
-      : createClient(instanceOpts.clientOpts)
-  ) as RedisClientType;
+  const client: RedisClientType = (instanceOpts.client
+    ? instanceOpts.client
+    : createClient(instanceOpts.clientOpts)) as RedisClientType;
 
   await client.connect();
 
-  const { withLock, pSetExAndSAdd, get, scanSetAll, delAndRem, sAdd } =
-    makeEasyRedis(client);
+  const {
+    withLock,
+    pSetExAndSAdd,
+    get,
+    scanSetAll,
+    delAndRem,
+    sAdd,
+  } = makeEasyRedis(client);
 
   if (instanceOpts.prefix) {
     SafeString.check(instanceOpts.prefix);
