@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+## [2.0.0](https://github.com/politics-rewired/memoredis/compare/v1.1.1...v2.0.0) (2022-10-21)
+
+
+### Features
+
+* update to redis v4 cli ([#33](https://github.com/politics-rewired/memoredis/issues/33)) ([8172642](https://github.com/politics-rewired/memoredis/commit/8172642b85bf231b75346821c65eb4f1377f60c7))
+
 ### [1.1.1](https://github.com/politics-rewired/memoredis/compare/v1.1.0...v1.1.1) (2021-01-26)
 
 ## [1.1.0](https://github.com/politics-rewired/memoredis/compare/v1.0.8...v1.1.0) (2020-09-07)
