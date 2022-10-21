@@ -1,0 +1,56 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+jobs:
+  cut-gh-release:
+    runs-on: ubuntu-latest
+    env:
+      BODY_PATH: release-body.txt
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v2
+      - name: Parse pre-release semver string
+        id: semver_parser
+        uses: booxmedialtd/ws-action-parse-semver@v1
+        with:
+          input_string: ${{ github.ref }}
+          version_extractor_regex: '\/v(.*)$'
+      - name: Generate Changelog
+        run: awk "/[#]{2,3} \[${{ steps.semver_parser.outputs.fullversion }}/{flag=1; next} /[#]{2,3} \[/{flag=0} flag" CHANGELOG.md >> $BODY_PATH
+      - name: Release
+        uses: softprops/action-gh-release@v1
+        if: startsWith(github.ref, 'refs/tags/v')
+        with:
+          name: Version ${{ steps.semver_parser.outputs.fullversion }}
+          tag_name: v${{ steps.semver_parser.outputs.fullversion }}
+          body_path: ${{ env.BODY_PATH }}
+          prerelease: ${{ !!steps.semver_parser.outputs.prerelease }}
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+  deploy-npm-release:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v2
+      - uses: actions/setup-node@v2
+        with:
+          node-version: '16'
+      - name: Get yarn cache directory path
+        id: yarn-cache-dir-path
+        run: echo "::set-output name=dir::$(yarn cache dir)"
+      - uses: actions/cache@v2
+        id: yarn-cache # use this to check for `cache-hit` (`steps.yarn-cache.outputs.cache-hit != 'true'`)
+        with:
+          path: ${{ steps.yarn-cache-dir-path.outputs.dir }}
+          key: ${{ runner.os }}-yarn-${{ hashFiles('**/yarn.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-yarn-
+      - run: yarn install
+      - run: yarn build
+      - uses: JS-DevTools/npm-publish@v1
+        with:
+          token: ${{ secrets.NPM_AUTOMATION_TOKEN }}
