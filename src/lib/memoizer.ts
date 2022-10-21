@@ -105,7 +105,7 @@ export const createMemoizer = async (
       // attempt early memoized return
       const foundResult = await get(redisKey);
       if (foundResult) {
-        return JSON.parse(foundResult);
+        return foundResult;
       }
 
       return withLock(
@@ -114,7 +114,7 @@ export const createMemoizer = async (
         async () => {
           const foundResultAfterLock = await get(redisKey);
           if (foundResultAfterLock) {
-            return JSON.parse(foundResultAfterLock);
+            return foundResultAfterLock;
           }
 
           const result = await fn(args);

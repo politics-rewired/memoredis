@@ -35,9 +35,13 @@ export const makeEasyRedis = (client: RedisClientType) => {
       .exec();
   };
 
-  const get = (key: string) => client.get(key);
+  const get = async (key: string) => {
+    const result = await client.get(key);
 
-  const scan = (match: string, cursor?: number) =>
+    return result ? JSON.parse(result) : null;
+  };
+
+  const scan = async (match: string, cursor?: number) =>
     client.scan(cursor ?? 0, {
       MATCH: match,
     });
@@ -56,7 +60,7 @@ export const makeEasyRedis = (client: RedisClientType) => {
     return keys;
   };
 
-  const scanSet = (setKey: string, match: string, cursor?: number) =>
+  const scanSet = async (setKey: string, match: string, cursor?: number) =>
     client.sScan(setKey, cursor ?? 0, { MATCH: match });
 
   const scanSetAll = async (setKey: string, match: string) => {
