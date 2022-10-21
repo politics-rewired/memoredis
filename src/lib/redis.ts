@@ -1,199 +1,105 @@
-import { jsonDateParser } from 'json-date-parser';
-import { RedisClient } from 'redis';
-import redisLock from 'redis-lock';
-import { Logger } from './memoizer';
+import { RedisClientType } from 'redis';
+import { Lock } from 'redis-promise-lock';
 
-export const makeEasyRedis = (client: RedisClient, logger: Logger) => {
-  const cbLock = redisLock(client);
-  const withLock = <T>(key, timeout, cb): Promise<T> =>
-    new Promise(resolve => {
-      cbLock(key, timeout, async release => {
-        const result = await cb();
-        release();
-        return resolve(result as T);
-      });
-    });
+export const makeEasyRedis = (client: RedisClientType) => {
+  const lockerRoom = new Lock(client);
 
-  const psetex = (key: string, milliseconds: number, value: any) =>
-    // tslint:disable-next-line: variable-name
-    new Promise((resolve, _reject) => {
-      let jsonValue;
-      try {
-        jsonValue = JSON.stringify(value);
-      } catch (err) {
-        logger.error(
-          `memoredis: JSON.stringify error setting key ${key}. Raw value ${value}`,
-          err
-        );
-        return resolve(null);
-      }
+  const withLock = async (key: string, timeout: number, fn: () => void) => {
+    try {
+      await lockerRoom.acquireLock(`lock-${key}`, { ttl: timeout / 1000 });
+      const result = await fn();
+      return result;
+    } finally {
+      await lockerRoom.releaseLock(`lock-${key}`);
+    }
+  };
 
-      client.psetex(key, milliseconds, jsonValue, err => {
-        if (err) {
-          logger.error(`memoredis: redis error setting key ${key}.`, err);
-          return resolve(null);
-        }
-        return resolve(true);
-      });
-    });
+  const pSetEx = async (key: string, milliseconds: number, value: any) => {
+    const jsonValue = JSON.stringify(value);
 
-  const psetexAndSadd = (
+    return client.pSetEx(key, milliseconds, jsonValue);
+  };
+
+  const pSetExAndSAdd = async (
     setKey: string,
     key: string,
     milliseconds: number,
     value: any
-  ) =>
-    // tslint:disable-next-line: variable-name
-    new Promise((resolve, _reject) => {
-      let jsonValue;
-      try {
-        jsonValue = JSON.stringify(value);
-      } catch (err) {
-        logger.error(
-          `memoredis: JSON.stringify error setting key ${key}. Raw value ${value}`,
-          err
-        );
-        return resolve(null);
-      }
+  ) => {
+    const jsonValue = JSON.stringify(value);
 
-      client
-        .multi()
-        .sadd(setKey, key)
-        .psetex(key, milliseconds, jsonValue)
-        // tslint:disable-next-line: variable-name
-        .exec((err, _replies) => {
-          if (err) {
-            logger.error(`memoredis: redis error setting key ${key}.`, err);
-            return resolve(null);
-          }
-          return resolve(true);
-        });
-    });
+    return client
+      .multi()
+      .sAdd(setKey, key)
+      .pSetEx(key, milliseconds, jsonValue)
+      .exec();
+  };
 
-  const get = <T>(key: string): Promise<T | null> =>
-    // tslint:disable-next-line: variable-name
-    new Promise((resolve, _reject) =>
-      client.get(key, (err, reply) => {
-        if (err) {
-          logger.error(`memoredis: redis error getting key ${key}.`, err);
-          return resolve(null);
-        }
-        if (reply === null) {
-          return resolve(null);
-        }
+  const get = async (key: string) => {
+    const result = await client.get(key);
 
-        try {
-          return resolve(JSON.parse(reply, jsonDateParser) as T);
-        } catch (err) {
-          logger.error(
-            `memoredis: JSON parse error getting key ${key}. Reply as ${reply}`,
-            err
-          );
-          return resolve(null);
-        }
-      })
-    );
+    return result ? JSON.parse(result) : null;
+  };
 
-  const scan = (match: string, cursor?: string) =>
-    new Promise((resolve, reject) => {
-      const callback = (err, result) => {
-        if (err) {
-          return reject(err);
-        }
-
-        const [newCursor, keys] = result;
-        return resolve([newCursor, keys]);
-      };
-
-      return cursor
-        ? client.scan(cursor, 'match', match, callback)
-        : client.scan('0', 'match', match, callback);
+  const scan = async (match: string, cursor?: number) =>
+    client.scan(cursor ?? 0, {
+      MATCH: match,
     });
 
   const scanAll = async (match: string) => {
     let keys: string[] = [];
     let cursor;
 
-    while (cursor !== '0') {
+    while (cursor !== 0) {
       const result = await scan(match, cursor);
 
-      cursor = result[0];
-      keys = keys.concat(result[1]);
+      cursor = result.cursor;
+      keys = keys.concat(result.keys);
     }
 
     return keys;
   };
 
-  const scanSet = (setKey: string, match: string, cursor?: string) =>
-    new Promise((resolve, reject) => {
-      const callback = (err, result) => {
-        if (err) {
-          return reject(err);
-        }
-
-        const [newCursor, keys] = result;
-        return resolve([newCursor, keys]);
-      };
-
-      return cursor
-        ? client.sscan(setKey, cursor, 'match', match, callback)
-        : client.sscan(setKey, '0', 'match', match, callback);
-    });
+  const scanSet = async (setKey: string, match: string, cursor?: number) =>
+    client.sScan(setKey, cursor ?? 0, { MATCH: match });
 
   const scanSetAll = async (setKey: string, match: string) => {
     let keys: string[] = [];
     let cursor;
 
-    while (cursor !== '0') {
+    while (cursor !== 0) {
       const result = await scanSet(setKey, match, cursor);
-      cursor = result[0];
-      keys = keys.concat(result[1]);
+
+      cursor = result.cursor;
+      keys = keys.concat(result.members);
     }
 
     return keys;
   };
 
-  const del = async (keys: string[]) =>
-    new Promise((resolve, reject) =>
-      client.del(keys, err => (err ? reject(err) : resolve(true)))
-    );
+  const del = async (keys: string[]) => client.del(keys);
 
   const delAndRem = async (setKey: string, valueKeys: string[]) =>
-    new Promise((resolve, reject) =>
-      client
-        .multi()
-        .del(valueKeys)
-        .srem(setKey, valueKeys)
-        // tslint:disable-next-line: variable-name
-        .exec((err, _replies) => (err ? reject(err) : resolve(true)))
-    );
+    client.multi().del(valueKeys).sRem(setKey, valueKeys).exec();
 
-  const sadd = async (setKey: string, valueKey: string) =>
-    new Promise((resolve, reject) =>
-      client.sadd(setKey, valueKey, (err, reply) =>
-        err ? reject(err) : resolve(reply)
-      )
-    );
+  const sAdd = async (setKey: string, valueKey: string) =>
+    client.sAdd(setKey, valueKey);
 
-  const srem = async (setKey: string, valueKeys: string[]) =>
-    new Promise((resolve, reject) => {
-      client.srem(setKey, valueKeys, (err, reply) =>
-        err ? reject(err) : resolve(reply)
-      );
-    });
+  const sRem = async (setKey: string, valueKeys: string[]) =>
+    client.sRem(setKey, valueKeys);
 
   return {
     del,
     delAndRem,
     get,
-    psetex,
-    psetexAndSadd,
-    sadd,
+    pSetEx,
+    pSetExAndSAdd,
+    sAdd,
+    sRem,
     scan,
     scanAll,
     scanSet,
     scanSetAll,
-    srem,
-    withLock
+    withLock,
   };
 };

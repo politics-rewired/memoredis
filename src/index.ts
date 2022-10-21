@@ -4,7 +4,7 @@ import {
   Memoizer,
   MemoizeOpts,
   MemoizedFunctionArgs,
-  MemoizableFunction
+  MemoizableFunction,
 } from './lib/memoizer';
 
 export {
@@ -13,7 +13,7 @@ export {
   MemoizeOpts,
   MemoizedFunctionArgs,
   MemoizableFunction,
-  createMemoizer
+  createMemoizer,
 };
 
 export default createMemoizer;
