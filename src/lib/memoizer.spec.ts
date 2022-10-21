@@ -4,11 +4,12 @@ import { createMemoizer, produceKeyWithArgs } from './memoizer';
 const flushRedis = async () => {
   const client = createClient();
   await client.connect();
-  await client.flushAll();
+  await client.flushDb();
   await client.disconnect();
 };
 
-const sleep = (n) => new Promise((resolve) => setTimeout(resolve, n * 1000));
+const sleep = (n: number) =>
+  new Promise((resolve) => setTimeout(resolve, n * 1000));
 
 describe('produceKeyWithArgs', () => {
   test('produceKeyWithArgs should produce the same key for differently ordered objects', () => {
@@ -24,10 +25,6 @@ describe('produceKeyWithArgs', () => {
 });
 
 describe('basic functionality', () => {
-  beforeAll(async () => {
-    await flushRedis();
-  });
-
   afterAll(async () => {
     await flushRedis();
   });
@@ -98,10 +95,6 @@ describe('basic functionality', () => {
 });
 
 describe('invalidation', () => {
-  beforeAll(async () => {
-    await flushRedis();
-  });
-
   afterAll(async () => {
     await flushRedis();
   });
@@ -197,6 +190,10 @@ describe('invalidation', () => {
 });
 
 describe('prefixes', () => {
+  afterAll(async () => {
+    await flushRedis();
+  });
+
   test('should keep keyspaces separate', async () => {
     const a = await createMemoizer({ prefix: 'a' });
     const b = await createMemoizer({ prefix: 'b' });
@@ -227,6 +224,10 @@ describe('prefixes', () => {
 });
 
 describe('empty mode', () => {
+  afterAll(async () => {
+    await flushRedis();
+  });
+
   test('if empty mode should not cache', async () => {
     const memoizer = await createMemoizer({ emptyMode: true });
 
@@ -250,6 +251,10 @@ describe('empty mode', () => {
 });
 
 describe('scan all cursor', () => {
+  afterAll(async () => {
+    await flushRedis();
+  });
+
   test('if we have 1000 keys we should be able to invalidate them all quickly', async () => {
     const m = await createMemoizer({ prefix: 'a' });
 

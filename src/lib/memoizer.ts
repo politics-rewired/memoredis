@@ -64,20 +64,16 @@ export const createMemoizer = async (
     };
   }
 
-  const client: RedisClientType = (instanceOpts.client
-    ? instanceOpts.client
-    : createClient(instanceOpts.clientOpts)) as RedisClientType;
+  const client: RedisClientType = (
+    instanceOpts.client
+      ? instanceOpts.client
+      : createClient(instanceOpts.clientOpts)
+  ) as RedisClientType;
 
   await client.connect();
 
-  const {
-    withLock,
-    pSetExAndSAdd,
-    get,
-    scanSetAll,
-    delAndRem,
-    sAdd,
-  } = makeEasyRedis(client);
+  const { withLock, pSetExAndSAdd, get, scanSetAll, delAndRem } =
+    makeEasyRedis(client);
 
   if (instanceOpts.prefix) {
     SafeString.check(instanceOpts.prefix);
@@ -107,10 +103,9 @@ export const createMemoizer = async (
       const setKey = produceSetKey(instanceOpts.prefix, opts.key);
 
       // attempt early memoized return
-      const foundResult = (await get(redisKey)) as U;
+      const foundResult = await get(redisKey);
       if (foundResult) {
-        await sAdd(setKey, redisKey);
-        return foundResult;
+        return JSON.parse(foundResult);
       }
 
       return withLock(
@@ -119,7 +114,7 @@ export const createMemoizer = async (
         async () => {
           const foundResultAfterLock = await get(redisKey);
           if (foundResultAfterLock) {
-            return foundResultAfterLock;
+            return JSON.parse(foundResultAfterLock);
           }
 
           const result = await fn(args);
