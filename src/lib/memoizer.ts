@@ -24,18 +24,18 @@ export interface MemoizeOpts {
   ttl?: number;
 }
 
-export interface MemoizedFunctionArgs {
-  [key: string]: any;
-}
+export type MemoizedFunctionArgs = Record<string, unknown> | void;
 
-export type MemoizableFunction<T, U> = (args: T) => Promise<U>;
+export type MemoizableFunction<U, T extends MemoizedFunctionArgs = void> = (
+  args: T
+) => Promise<U>;
 
 export interface Memoizer {
   invalidate(key: string, args: MemoizedFunctionArgs): Promise<void>;
-  memoize<T, U>(
-    fn: MemoizableFunction<T, U>,
+  memoize<U, T extends MemoizedFunctionArgs>(
+    fn: MemoizableFunction<U, T>,
     opts: MemoizeOpts
-  ): MemoizableFunction<T, U>;
+  ): MemoizableFunction<U, T>;
   quit(): Promise<void>;
   end(): Promise<void>;
 }
@@ -52,7 +52,10 @@ export const createMemoizer = async (
       invalidate: async (_key: string, _forArgs: MemoizedFunctionArgs) => {
         // do nothing
       },
-      memoize: <T, U>(fn: MemoizableFunction<T, U>, _opts: MemoizeOpts) => {
+      memoize: <U, T extends MemoizedFunctionArgs>(
+        fn: MemoizableFunction<U, T>,
+        _opts: MemoizeOpts
+      ) => {
         return async (args: T): Promise<U> => {
           return fn(args);
         };
@@ -70,7 +73,9 @@ export const createMemoizer = async (
       : createClient(instanceOpts.clientOpts)
   ) as RedisClientType;
 
-  await client.connect();
+  if (!instanceOpts.client) {
+    await client.connect();
+  }
 
   const { withLock, pSetExAndSAdd, get, scanSetAll, delAndRem } =
     makeEasyRedis(client);
@@ -80,13 +85,14 @@ export const createMemoizer = async (
   }
 
   const invalidate = async (key: string, forArgs: MemoizedFunctionArgs) => {
-    const setKey = produceSetKey(instanceOpts.prefix, key);
+    const setKey = produceSetKey(instanceOpts.prefix ?? '', key);
     SafeString.check(key);
 
     const glob =
-      [produceKey(instanceOpts.prefix, key), ...stringifyArgs(forArgs)].join(
-        '*'
-      ) + '*';
+      [
+        produceKey(instanceOpts.prefix ?? '', key),
+        ...stringifyArgs(forArgs),
+      ].join('*') + '*';
 
     const cachedKeys = await scanSetAll(setKey, glob);
 
@@ -95,12 +101,19 @@ export const createMemoizer = async (
     }
   };
 
-  const memoize = <T, U>(fn: MemoizableFunction<T, U>, opts: MemoizeOpts) => {
+  const memoize = <T extends MemoizedFunctionArgs, U>(
+    fn: MemoizableFunction<U, T>,
+    opts: MemoizeOpts
+  ) => {
     SafeString.check(opts.key);
 
     return async (args: T): Promise<U> => {
-      const redisKey = produceKeyWithArgs(instanceOpts.prefix, opts.key, args);
-      const setKey = produceSetKey(instanceOpts.prefix, opts.key);
+      const redisKey = produceKeyWithArgs(
+        instanceOpts.prefix ?? '_',
+        opts.key,
+        args
+      );
+      const setKey = produceSetKey(instanceOpts.prefix ?? '', opts.key);
 
       // attempt early memoized return
       const foundResult = await get(redisKey);
@@ -150,9 +163,11 @@ const produceSetKey = (prefix: string, key: string) =>
   prefix ? `${prefix}|${key}-keyset` : `${key}-keyset`;
 
 const stringifyArgs = (args: MemoizedFunctionArgs) =>
-  Object.keys(args)
-    .map((key) => stringifyArg(key, args[key]))
-    .sort();
+  args
+    ? Object.keys(args)
+        .map((key) => stringifyArg(key, args[key]))
+        .sort()
+    : ['void'];
 
 const stringifyArg = (key: string, value: any) =>
   `${key}:${typeof value === 'object' ? objectHash(value) : value}`;
