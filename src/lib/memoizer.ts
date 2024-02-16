@@ -28,11 +28,13 @@ export interface MemoizedFunctionArgs {
   [key: string]: any;
 }
 
-export type MemoizableFunction<T, U> = (args: T) => Promise<U>;
+type ArgsType = Record<string, unknown> | undefined;
+
+export type MemoizableFunction<T extends ArgsType, U> = (args: T) => Promise<U>;
 
 export interface Memoizer {
   invalidate(key: string, args: MemoizedFunctionArgs): Promise<void>;
-  memoize<T, U>(
+  memoize<T extends ArgsType, U>(
     fn: MemoizableFunction<T, U>,
     opts: MemoizeOpts
   ): MemoizableFunction<T, U>;
@@ -52,7 +54,10 @@ export const createMemoizer = async (
       invalidate: async (_key: string, _forArgs: MemoizedFunctionArgs) => {
         // do nothing
       },
-      memoize: <T, U>(fn: MemoizableFunction<T, U>, _opts: MemoizeOpts) => {
+      memoize: <T extends ArgsType, U>(
+        fn: MemoizableFunction<T, U>,
+        _opts: MemoizeOpts
+      ) => {
         return async (args: T): Promise<U> => {
           return fn(args);
         };
@@ -95,7 +100,10 @@ export const createMemoizer = async (
     }
   };
 
-  const memoize = <T, U>(fn: MemoizableFunction<T, U>, opts: MemoizeOpts) => {
+  const memoize = <T extends ArgsType, U>(
+    fn: MemoizableFunction<T, U>,
+    opts: MemoizeOpts
+  ) => {
     SafeString.check(opts.key);
 
     return async (args: T): Promise<U> => {
