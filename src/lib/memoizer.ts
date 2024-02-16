@@ -30,8 +30,6 @@ export type MemoizableFunction<U, T extends MemoizedFunctionArgs = void> = (
   args: T
 ) => Promise<U>;
 
-// (args?: T) => Promise<U>;
-
 export interface Memoizer {
   invalidate(key: string, args: MemoizedFunctionArgs): Promise<void>;
   memoize<U, T extends MemoizedFunctionArgs>(
@@ -85,13 +83,14 @@ export const createMemoizer = async (
   }
 
   const invalidate = async (key: string, forArgs: MemoizedFunctionArgs) => {
-    const setKey = produceSetKey(instanceOpts.prefix, key);
+    const setKey = produceSetKey(instanceOpts.prefix ?? '', key);
     SafeString.check(key);
 
     const glob =
-      [produceKey(instanceOpts.prefix, key), ...stringifyArgs(forArgs)].join(
-        '*'
-      ) + '*';
+      [
+        produceKey(instanceOpts.prefix ?? '', key),
+        ...stringifyArgs(forArgs),
+      ].join('*') + '*';
 
     const cachedKeys = await scanSetAll(setKey, glob);
 
@@ -107,8 +106,12 @@ export const createMemoizer = async (
     SafeString.check(opts.key);
 
     return async (args: T): Promise<U> => {
-      const redisKey = produceKeyWithArgs(instanceOpts.prefix, opts.key, args);
-      const setKey = produceSetKey(instanceOpts.prefix, opts.key);
+      const redisKey = produceKeyWithArgs(
+        instanceOpts.prefix ?? '_',
+        opts.key,
+        args
+      );
+      const setKey = produceSetKey(instanceOpts.prefix ?? '', opts.key);
 
       // attempt early memoized return
       const foundResult = await get(redisKey);

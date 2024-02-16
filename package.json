@@ -2,12 +2,15 @@
   "name": "memoredis",
   "version": "2.0.0",
   "description": "Redis memoization library with good Typescript generics, locking, and argument-wide bulk invalidation",
-  "main": "build/main/index.js",
-  "exports" : {
+  "files": [
+    "dist"
+  ],
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
     ".": {
-      "import": "./build/module/index.js",
-      "require": "./build/main/index.js",
-      "types": "./build/main/index.d.ts"
+      "import": "./dist/index.mjs",
+      "require": "./dist/index.js"
     }
   },
   "homepage": "https://github.com/politics-rewired/memoredis#readme",
@@ -16,9 +19,7 @@
   "keywords": [],
   "scripts": {
     "describe": "npm-scripts-info",
-    "build": "run-s clean && run-p build:*",
-    "build:main": "tsc -p tsconfig.json",
-    "build:module": "tsc -p tsconfig.module.json",
+    "build": "tsup",
     "fix": "run-s fix:*",
     "fix:prettier": "prettier \"src/**/*.ts\" --write",
     "fix:lint": "eslint --ext js,ts --fix .",
@@ -52,23 +53,20 @@
     "reset": "Delete all untracked files and reset the repo to the last commit",
     "prepare-release": "One-step: clean, build, test, publish docs, and prep a release"
   },
-  "engines": {
-    "node": ">=8.9"
-  },
   "dependencies": {
     "json-date-parser": "^1.0.1",
     "json-stable-stringify": "^1.0.1",
     "lodash": "^4.17.21",
     "redis": "^4.3.1",
     "redis-promise-lock": "^1.0.4",
-    "runtypes": "^6.6.0",
-    "sha.js": "^2.4.11"
+    "runtypes": "^6.6.0"
   },
   "devDependencies": {
     "@bitjson/npm-scripts-info": "^1.0.0",
     "@bitjson/typedoc": "^0.15.0-0",
     "@istanbuljs/nyc-config-typescript": "^1.0.2",
     "@types/jest": "^29.2.0",
+    "@types/json-stable-stringify": "^1.0.36",
     "@types/lodash": "^4.14.186",
     "@types/node": "^18.11.0",
     "@typescript-eslint/eslint-plugin": "^5.40.1",
@@ -91,16 +89,8 @@
     "trash-cli": "^5.0.0",
     "ts-jest": "^29.0.3",
     "ts-node": "^10.9.1",
-    "typescript": "^4.8.4"
-  },
-  "ava": {
-    "failFast": true,
-    "files": [
-      "build/main/**/*.spec.js"
-    ],
-    "sources": [
-      "build/main/**/*.js"
-    ]
+    "tsup": "^8.0.2",
+    "typescript": "^5.3.3"
   },
   "config": {
     "commitizen": {
