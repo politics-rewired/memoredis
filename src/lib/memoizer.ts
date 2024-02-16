@@ -73,7 +73,9 @@ export const createMemoizer = async (
       : createClient(instanceOpts.clientOpts)
   ) as RedisClientType;
 
-  await client.connect();
+  if (!instanceOpts.client) {
+    await client.connect();
+  }
 
   const { withLock, pSetExAndSAdd, get, scanSetAll, delAndRem } =
     makeEasyRedis(client);
