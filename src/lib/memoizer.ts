@@ -24,20 +24,20 @@ export interface MemoizeOpts {
   ttl?: number;
 }
 
-export interface MemoizedFunctionArgs {
-  [key: string]: any;
-}
+export type MemoizedFunctionArgs = Record<string, unknown> | void;
 
-type ArgsType = Record<string, unknown> | undefined;
+export type MemoizableFunction<U, T extends MemoizedFunctionArgs = void> = (
+  args: T
+) => Promise<U>;
 
-export type MemoizableFunction<T extends ArgsType, U> = (args: T) => Promise<U>;
+// (args?: T) => Promise<U>;
 
 export interface Memoizer {
   invalidate(key: string, args: MemoizedFunctionArgs): Promise<void>;
-  memoize<T extends ArgsType, U>(
-    fn: MemoizableFunction<T, U>,
+  memoize<U, T extends MemoizedFunctionArgs>(
+    fn: MemoizableFunction<U, T>,
     opts: MemoizeOpts
-  ): MemoizableFunction<T, U>;
+  ): MemoizableFunction<U, T>;
   quit(): Promise<void>;
   end(): Promise<void>;
 }
@@ -54,8 +54,8 @@ export const createMemoizer = async (
       invalidate: async (_key: string, _forArgs: MemoizedFunctionArgs) => {
         // do nothing
       },
-      memoize: <T extends ArgsType, U>(
-        fn: MemoizableFunction<T, U>,
+      memoize: <U, T extends MemoizedFunctionArgs>(
+        fn: MemoizableFunction<U, T>,
         _opts: MemoizeOpts
       ) => {
         return async (args: T): Promise<U> => {
@@ -100,8 +100,8 @@ export const createMemoizer = async (
     }
   };
 
-  const memoize = <T extends ArgsType, U>(
-    fn: MemoizableFunction<T, U>,
+  const memoize = <T extends MemoizedFunctionArgs, U>(
+    fn: MemoizableFunction<U, T>,
     opts: MemoizeOpts
   ) => {
     SafeString.check(opts.key);
@@ -158,9 +158,11 @@ const produceSetKey = (prefix: string, key: string) =>
   prefix ? `${prefix}|${key}-keyset` : `${key}-keyset`;
 
 const stringifyArgs = (args: MemoizedFunctionArgs) =>
-  Object.keys(args)
-    .map((key) => stringifyArg(key, args[key]))
-    .sort();
+  args
+    ? Object.keys(args)
+        .map((key) => stringifyArg(key, args[key]))
+        .sort()
+    : ['void'];
 
 const stringifyArg = (key: string, value: any) =>
   `${key}:${typeof value === 'object' ? objectHash(value) : value}`;

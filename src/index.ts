@@ -1,18 +1,18 @@
 import {
-  createMemoizer,
-  MemoizerOpts,
-  Memoizer,
+  MemoizableFunction,
   MemoizeOpts,
   MemoizedFunctionArgs,
-  MemoizableFunction,
+  Memoizer,
+  MemoizerOpts,
+  createMemoizer,
 } from './lib/memoizer';
 
 export {
-  MemoizerOpts,
-  Memoizer,
+  MemoizableFunction,
   MemoizeOpts,
   MemoizedFunctionArgs,
-  MemoizableFunction,
+  Memoizer,
+  MemoizerOpts,
   createMemoizer,
 };
 

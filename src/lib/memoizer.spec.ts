@@ -72,6 +72,27 @@ describe('basic functionality', () => {
     expect(mock).toHaveBeenCalledTimes(2);
   });
 
+  test('should accept no args', async () => {
+    const memoizer = await createMemoizer({});
+
+    const mock = jest.fn();
+
+    const memoizableFunction = async () => {
+      mock();
+      return 4;
+    };
+
+    const memoizedFunction = memoizer.memoize(memoizableFunction, {
+      key: 'different',
+    });
+
+    await memoizedFunction();
+    await memoizedFunction();
+    await memoizer.quit();
+
+    expect(mock).toHaveBeenCalledTimes(2);
+  });
+
   test('should lock duplicate calls', async () => {
     const memoizer = await createMemoizer({});
 
